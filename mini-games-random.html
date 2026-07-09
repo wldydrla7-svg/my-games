@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>랜덤 미니게임</title>
+<style>
+  :root{
+    --bg:#0d1117;
+    --panel:#151b23;
+    --line:#2b3440;
+    --text:#e6edf3;
+    --sub:#7d8590;
+    --accent:#39ff88;
+    --accent-dim:#1e7a4c;
+    --bad:#ff5c5c;
+    --amber:#ffb454;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0;padding:0;height:100%;
+    background:var(--bg);
+    color:var(--text);
+    font-family:'JetBrains Mono','Courier New',monospace;
+    -webkit-tap-highlight-color:transparent;
+    overscroll-behavior:none;
+  }
+  body{
+    display:flex;flex-direction:column;align-items:center;
+    min-height:100vh;
+    padding:16px;
+  }
+  .wrap{width:100%;max-width:480px;display:flex;flex-direction:column;gap:12px;flex:1;}
+
+  .adslot{
+    width:100%;min-height:60px;border:1px dashed var(--line);border-radius:6px;
+    display:flex;align-items:center;justify-content:center;
+    color:var(--sub);font-size:11px;letter-spacing:0.05em;
+  }
+
+  .titlebar{display:flex;align-items:baseline;gap:8px;color:var(--sub);font-size:12px;}
+  .titlebar .prompt{color:var(--accent);}
+  h1{font-size:17px;font-weight:600;margin:2px 0 0;color:var(--text);letter-spacing:-0.01em;}
+  .cursor{display:inline-block;width:8px;height:14px;background:var(--accent);animation:blink 1s step-end infinite;vertical-align:-2px;margin-left:2px;}
+  @keyframes blink{50%{opacity:0;}}
+
+  .hud{
+    display:flex;justify-content:space-between;align-items:center;
+    background:var(--panel);border:1px solid var(--line);border-radius:8px;
+    padding:10px 14px;font-size:13px;
+  }
+  .hud .stat{color:var(--sub);}
+  .hud .val{color:var(--accent);font-weight:600;margin-left:4px;}
+  .hud .val.next{color:var(--amber);}
+
+  .board{
+    display:grid;gap:8px;aspect-ratio:1/1;width:100%;position:relative;
+  }
+  .board.g5{grid-template-columns:repeat(5,1fr);}
+  .board.g4{grid-template-columns:repeat(4,1fr);}
+  .board.freefield{display:block;background:var(--panel);border:1px solid var(--line);border-radius:8px;overflow:hidden;}
+
+  .cell{
+    background:var(--panel);border:1px solid var(--line);border-radius:8px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:clamp(15px,5vw,24px);font-weight:600;color:var(--text);
+    user-select:none;-webkit-user-select:none;touch-action:manipulation;
+    transition:transform .08s ease, background .12s ease, border-color .12s ease, color .12s ease;
+  }
+  .cell.done{background:var(--accent-dim);border-color:var(--accent);color:#eafff2;opacity:0.55;}
+  .cell.wrong{animation:shake .25s ease;border-color:var(--bad);color:var(--bad);}
+  .cell:active{transform:scale(0.92);}
+  @keyframes shake{0%,100%{transform:translateX(0);}25%{transform:translateX(-4px);}75%{transform:translateX(4px);}}
+
+  .card{
+    background:var(--panel);border:1px solid var(--line);border-radius:8px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:clamp(18px,6vw,28px);user-select:none;-webkit-user-select:none;
+    touch-action:manipulation;transition:transform .1s ease, background .12s ease;
+  }
+  .card.flip{background:#1c2733;border-color:var(--amber);}
+  .card.matched{background:var(--accent-dim);border-color:var(--accent);opacity:0.5;}
+  .card:active{transform:scale(0.94);}
+
+  .target{
+    position:absolute;width:54px;height:54px;border-radius:50%;
+    background:var(--accent);border:2px solid #0d1117;
+    display:flex;align-items:center;justify-content:center;
+    font-size:13px;font-weight:700;color:#04140b;
+    touch-action:manipulation;user-select:none;-webkit-user-select:none;
+  }
+  .target:active{transform:scale(0.9);}
+
+  .startscreen,.endscreen{
+    background:var(--panel);border:1px solid var(--line);border-radius:10px;
+    padding:28px 20px;text-align:center;display:flex;flex-direction:column;gap:14px;
+  }
+  .startscreen p, .endscreen p{color:var(--sub);font-size:13px;margin:0;line-height:1.6;}
+  .endscreen .big{font-size:15px;color:var(--text);}
+  .endscreen .time{font-size:34px;font-weight:700;color:var(--accent);margin:2px 0;}
+  .endscreen .best{font-size:12px;color:var(--amber);}
+  .modelabel{font-size:12px;color:var(--amber);letter-spacing:0.04em;}
+
+  button.primary{
+    background:var(--accent);color:#04140b;border:none;border-radius:8px;
+    padding:13px 18px;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;letter-spacing:0.01em;
+  }
+  button.primary:active{transform:scale(0.98);}
+
+  .hidden{display:none !important;}
+  footer{color:var(--sub);font-size:11px;text-align:center;padding:6px 0 2px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="adslot" id="ad-top">광고 영역 (예: 반응형 디스플레이 광고)</div>
+
+  <div class="titlebar"><span class="prompt">$</span> random-mini-game --pick auto</div>
+  <h1>랜덤 미니게임<span class="cursor"></span></h1>
+
+  <div class="hud">
+    <span class="stat">TIME<span class="val" id="timeVal">0.0s</span></span>
+    <span class="stat" id="goalStat">GOAL<span class="val next" id="goalVal">-</span></span>
+    <span class="stat">BEST<span class="val" id="bestVal">--</span></span>
+  </div>
+
+  <div id="startscreen" class="startscreen">
+    <p>매판 숫자맞추기 · 클릭게임 · 카드퍼즐 중 하나가 무작위로 나와요.<br>어떤 게임이 걸릴지는 시작해봐야 압니다.</p>
+    <button class="primary" id="startBtn">게임 시작</button>
+  </div>
+
+  <div id="modelabel" class="modelabel hidden"></div>
+  <div id="board" class="board hidden"></div>
+
+  <div id="endscreen" class="endscreen hidden">
+    <div class="big" id="resultLabel">클리어!</div>
+    <div class="time" id="finalTime">0.0s</div>
+    <div class="best" id="bestLabel"></div>
+    <button class="primary" id="retryBtn">다시 하기 (다른 게임일 수 있어요)</button>
+  </div>
+
+  <div class="adslot" id="ad-bottom">광고 영역 (예: 결과 화면 하단 배너)</div>
+
+  <footer>매판 게임 종류와 배치가 랜덤입니다 · 최고기록은 게임별로 이 브라우저에 저장돼요</footer>
+</div>
+
+<script>
+(function(){
+  var board = document.getElementById('board');
+  var startscreen = document.getElementById('startscreen');
+  var endscreen = document.getElementById('endscreen');
+  var modelabel = document.getElementById('modelabel');
+  var timeVal = document.getElementById('timeVal');
+  var goalVal = document.getElementById('goalVal');
+  var bestVal = document.getElementById('bestVal');
+  var finalTime = document.getElementById('finalTime');
+  var bestLabel = document.getElementById('bestLabel');
+  var resultLabel = document.getElementById('resultLabel');
+  var startBtn = document.getElementById('startBtn');
+  var retryBtn = document.getElementById('retryBtn');
+
+  var MODES = [
+    { key:'numtap', label:'숫자 순서 터치', storeKey:'numtap_best_v1' },
+    { key:'click',  label:'빠른 클릭',       storeKey:'click_best_v1' },
+    { key:'memory', label:'카드 짝 맞추기',   storeKey:'memory_best_v1' }
+  ];
+
+  var mode = null;
+  var startTime = 0;
+  var timerId = null;
+  var running = false;
+
+  function loadBest(storeKey){
+    var b = parseFloat(localStorage.getItem(storeKey));
+    return isNaN(b) ? null : b;
+  }
+  function renderBest(storeKey){
+    var b = loadBest(storeKey);
+    bestVal.textContent = b ? b.toFixed(1) + 's' : '--';
+  }
+
+  function shuffle(arr){
+    for (var i = arr.length - 1; i > 0; i--){
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+    }
+    return arr;
+  }
+  function pickMode(){
+    return MODES[Math.floor(Math.random() * MODES.length)];
+  }
+
+  function tick(){
+    var elapsed = (Date.now() - startTime) / 1000;
+    timeVal.textContent = elapsed.toFixed(1) + 's';
+  }
+  function startTimer(){
+    startTime = Date.now();
+    timerId = setInterval(tick, 100);
+  }
+
+  function finish(){
+    running = false;
+    clearInterval(timerId);
+    var elapsed = (Date.now() - startTime) / 1000;
+    finalTime.textContent = elapsed.toFixed(1) + 's';
+
+    var best = loadBest(mode.storeKey);
+    var isNewBest = !best || elapsed < best;
+    if (isNewBest){
+      localStorage.setItem(mode.storeKey, elapsed.toFixed(2));
+      resultLabel.textContent = '신기록! (' + mode.label + ')';
+      bestLabel.textContent = '이전 최고기록을 갱신했어요';
+    } else {
+      resultLabel.textContent = '클리어! (' + mode.label + ')';
+      bestLabel.textContent = '최고기록 ' + best.toFixed(1) + 's';
+    }
+    renderBest(mode.storeKey);
+
+    setTimeout(function(){
+      board.classList.add('hidden');
+      modelabel.classList.add('hidden');
+      endscreen.classList.remove('hidden');
+    }, 300);
+  }
+
+  // ---------- MODE: numtap ----------
+  function initNumtap(){
+    board.className = 'board g5';
+    goalVal.textContent = '1';
+    var nums = [];
+    for (var i = 1; i <= 25; i++) nums.push(i);
+    shuffle(nums);
+    board.innerHTML = '';
+    var next = 1;
+    nums.forEach(function(n){
+      var cell = document.createElement('div');
+      cell.className = 'cell';
+      cell.textContent = n;
+      cell.addEventListener('click', function(){
+        if (!running) return;
+        if (n === next){
+          cell.classList.add('done');
+          next++;
+          goalVal.textContent = next <= 25 ? next : '-';
+          if (next > 25) finish();
+        } else {
+          cell.classList.remove('wrong');
+          void cell.offsetWidth;
+          cell.classList.add('wrong');
+          setTimeout(function(){ cell.classList.remove('wrong'); }, 250);
+        }
+      });
+      board.appendChild(cell);
+    });
+  }
+
+  // ---------- MODE: click target ----------
+  function initClick(){
+    board.className = 'board freefield';
+    board.innerHTML = '';
+    var total = 15;
+    var hit = 0;
+    goalVal.textContent = total;
+
+    function spawn(){
+      var rect = board.getBoundingClientRect();
+      var size = 54;
+      var maxX = Math.max(rect.width - size, 10);
+      var maxY = Math.max(rect.height - size, 10);
+      var x = Math.random() * maxX;
+      var y = Math.random() * maxY;
+      var t = document.createElement('div');
+      t.className = 'target';
+      t.textContent = 'TAP';
+      t.style.left = x + 'px';
+      t.style.top = y + 'px';
+      t.addEventListener('click', function(){
+        if (!running) return;
+        hit++;
+        goalVal.textContent = (total - hit) > 0 ? (total - hit) : '-';
+        t.remove();
+        if (hit >= total){
+          finish();
+        } else {
+          spawn();
+        }
+      });
+      board.appendChild(t);
+    }
+    spawn();
+  }
+
+  // ---------- MODE: memory match ----------
+  function initMemory(){
+    board.className = 'board g4';
+    board.innerHTML = '';
+    var symbols = ['\ud83c\udf4e','\ud83c\udf4b','\ud83c\udf47','\ud83c\udf49','\ud83c\udf53','\ud83e\udd5d','\ud83c\udf52','\ud83c\udf51'];
+    var deck = shuffle(symbols.concat(symbols));
+    var flipped = [];
+    var matched = 0;
+    var locked = false;
+    goalVal.textContent = deck.length / 2;
+
+    deck.forEach(function(sym){
+      var card = document.createElement('div');
+      card.className = 'card';
+      card.textContent = '?';
+      card.dataset.sym = sym;
+      card.dataset.open = '0';
+      card.addEventListener('click', function(){
+        if (!running || locked) return;
+        if (card.dataset.open === '1') return;
+        if (flipped.length >= 2) return;
+
+        card.dataset.open = '1';
+        card.textContent = sym;
+        card.classList.add('flip');
+        flipped.push(card);
+
+        if (flipped.length === 2){
+          locked = true;
+          var a = flipped[0], b = flipped[1];
+          if (a.dataset.sym === b.dataset.sym){
+            a.classList.add('matched');
+            b.classList.add('matched');
+            matched++;
+            goalVal.textContent = (deck.length / 2 - matched) > 0 ? (deck.length / 2 - matched) : '-';
+            flipped = [];
+            locked = false;
+            if (matched === deck.length / 2){
+              finish();
+            }
+          } else {
+            setTimeout(function(){
+              a.classList.remove('flip'); a.textContent = '?'; a.dataset.open = '0';
+              b.classList.remove('flip'); b.textContent = '?'; b.dataset.open = '0';
+              flipped = [];
+              locked = false;
+            }, 550);
+          }
+        }
+      });
+      board.appendChild(card);
+    });
+  }
+
+  function startGame(){
+    mode = pickMode();
+    modelabel.textContent = '이번 판: ' + mode.label;
+    modelabel.classList.remove('hidden');
+    renderBest(mode.storeKey);
+    timeVal.textContent = '0.0s';
+
+    if (mode.key === 'numtap') initNumtap();
+    else if (mode.key === 'click') initClick();
+    else initMemory();
+
+    startscreen.classList.add('hidden');
+    endscreen.classList.add('hidden');
+    board.classList.remove('hidden');
+    running = true;
+    startTimer();
+  }
+
+  startBtn.addEventListener('click', startGame);
+  retryBtn.addEventListener('click', startGame);
+})();
+</script>
+</body>
+</html>
